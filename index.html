@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meu Boletim Escolar</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #202124;
+      padding-bottom: 40px;
+    }
+    /* ---------- TOPO ---------- */
+    .topo {
+      background: #fff;
+      padding: 20px 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .topo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #202124;
+    }
+    .topo p {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+    /* ---------- BARRA DE AÇÕES ---------- */
+    .barra-acoes {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 28px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primario {
+      background: #2563eb;
+      color: #fff;
+    }
+    .btn-primario:hover { background: #1d4ed8; }
+    .btn-secundario {
+      background: #e5e7eb;
+      color: #202124;
+    }
+    .btn-secundario:hover { background: #d1d5db; }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .nome-arquivo {
+      font-size: 13px;
+      color: #6b7280;
+    }
+    /* ---------- CARDS DE RESUMO ---------- */
+    .resumo {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      padding: 0 28px 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .card .rotulo {
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .card .valor {
+      font-size: 28px;
+      font-weight: 700;
+      color: #202124;
+      margin-top: 4px;
+    }
+    .card .valor.vermelho { color: #dc2626; }
+    .card .valor.verde { color: #16a34a; }
+    /* ---------- FILTRO E LEGENDA ---------- */
+    .filtro-legenda {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 0 28px 12px;
+    }
+    .filtro {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filtro label {
+      font-size: 14px;
+      color: #374151;
+      font-weight: 500;
+    }
+    .filtro input {
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 280px;
+      outline: none;
+    }
+    .filtro input:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    .legenda {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #4b5563;
+    }
+    .legenda .item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .legenda .item.vermelho { background: #fee2e2; color: #991b1b; }
+    .legenda .item.verde { background: #dcfce7; color: #166534; }
+    .legenda .item.cinza { background: #f3f4f6; color: #6b7280; }
+    /* ---------- ÁREA PRINCIPAL (ABAS + GRÁFICO) ---------- */
+    .area-principal {
+      display: flex;
+      gap: 18px;
+      padding: 0 28px;
+      align-items: flex-start;
+    }
+    .abas-container {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      overflow: hidden;
+    }
+    .abas {
+      display: flex;
+      border-bottom: 1px solid #e5e7eb;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+    .aba {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #6b7280;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .aba:hover { color: #202124; }
+    .aba.ativo {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+      font-weight: 600;
+    }
+    .tabela-wrapper {
+      overflow: auto;
+      max-height: 520px;
+      position: relative;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    th {
+      background: #e5e7eb;
+      color: #202124;
+      font-weight: 600;
+      padding: 10px 12px;
+      text-align: center;
+      white-space: nowrap;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    th:first-child { text-align: left; min-width: 220px; }
+    td {
+      padding: 9px 12px;
+      text-align: center;
+      border-bottom: 1px solid #f3f4f6;
+      white-space: nowrap;
+    }
+    td:first-child {
+      text-align: left;
+      font-weight: 500;
+      min-width: 220px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    tbody tr.linha_recuperacao { background: #fff1f1; }
+    tbody tr.linha_recuperacao:hover { background: #ffe4e4; }
+    tbody tr.linha_normal { background: #fff; }
+    tbody tr.linha_normal:hover { background: #f9fafb; }
+    tbody tr.sem_nota { background: #f3f4f6; color: #9ca3af; }
+    tbody tr.sem_nota:hover { background: #e5e7eb; }
+    .mensagem-vazia {
+      padding: 40px 20px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+    }
+    /* ---------- PAINEL DO GRÁFICO ---------- */
+    .painel-grafico {
+      width: 380px;
+      flex-shrink: 0;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      padding: 16px 18px;
+      position: sticky;
+      top: 16px;
+    }
+    .painel-grafico h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #202124;
+      margin-bottom: 12px;
+    }
+    .grafico-wrapper {
+      position: relative;
+      height: 460px;
+    }
+    .grafico-wrapper canvas { max-height: 100%; }
+    /* ---------- STATUS BAR ---------- */
+    .status-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #f3f4f6;
+      border-top: 1px solid #e5e7eb;
+      padding: 8px 28px;
+      font-size: 13px;
+      color: #6b7280;
+      z-index: 10;
+    }
+    /* ---------- RESPONSIVO ---------- */
+    @media (max-width: 1050px) {
+      .area-principal { flex-direction: column; }
+      .painel-grafico { width: 100%; position: static; }
+      .grafico-wrapper { height: 340px; }
+    }
+    @media (max-width: 600px) {
+      .topo, .barra-acoes, .resumo, .filtro-legenda, .area-principal {
+        padding-left: 14px; padding-right: 14px;
+      }
+      .barra-acoes { flex-direction: column; align-items: stretch; }
+      .filtro input { width: 100%; }
+      .resumo { grid-template-columns: 1fr 1fr; }
+      .card .valor { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== TOPO ==================== -->
+<header class="topo">
+  <h1>Meu Boletim Escolar</h1>
+  <p>Acompanhamento das notas do ano letivo</p>
+</header>
+
+<!-- ==================== BARRA DE AÇÕES ==================== -->
+<div class="barra-acoes">
+  <input type="file" id="inputArquivo" accept=".xlsx,.xls" hidden>
+  <button class="btn btn-primario" id="btnAbrir">📂 Abrir planilha Excel</button>
+  <button class="btn btn-secundario" id="btnExportar" disabled>📄 Exportar PDF</button>
+  <span class="nome-arquivo" id="nomeArquivo">Nenhuma planilha aberta</span>
+</div>
+
+<!-- ==================== CARDS DE RESUMO ==================== -->
+<div class="resumo">
+  <div class="card">
+    <div class="rotulo">Disciplinas</div>
+    <div class="valor" id="cardTotal">—</div>
+  </div>
+  <div class="card">
+    <div class="rotulo">Na média</div>
+    <div class="valor verde" id="cardAprovadas">—</div>
+  </div>
+  <div class="card">
+    <div class="rotulo">Em recuperação</div>
+    <div class="valor vermelho" id="cardRecuperacao">—</div>
+  </div>
+  <div class="card">
+    <div class="rotulo">Média geral</div>
+    <div class="valor" id="cardMedia">—</div>
+  </div>
+</div>
+
+<!-- ==================== FILTRO E LEGENDA ==================== -->
+<div class="filtro-legenda">
+  <div class="filtro">
+    <label for="pesquisa">Pesquisar disciplina:</label>
+    <input type="text" id="pesquisa" placeholder="Digite o nome da disciplina..." autocomplete="off">
+  </div>
+  <div class="legenda">
+    <span style="font-weight:600;">Legenda:</span>
+    <span class="item vermelho">Nota abaixo de 6</span>
+    <span class="item verde">Nota 6 ou mais</span>
+    <span class="item cinza">Sem nota</span>
+  </div>
+</div>
+
+<!-- ==================== ÁREA PRINCIPAL ==================== -->
+<div class="area-principal">
+  <!-- Abas e tabela -->
+  <div class="abas-container">
+    <div class="abas" id="abas"></div>
+    <div class="tabela-wrapper" id="tabelaWrapper">
+      <div class="mensagem-vazia" id="mensagemVazia">
+        Abra a planilha do boletim para começar.
+      </div>
+      <table id="tabela" hidden>
+        <thead id="tabelaHead"></thead>
+        <tbody id="tabelaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Painel do gráfico -->
+  <div class="painel-grafico">
+    <h3>Desempenho</h3>
+    <div class="grafico-wrapper">
+      <canvas id="grafico"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== STATUS BAR ==================== -->
+<footer class="status-bar" id="statusBar">
+  Abra a planilha do boletim para começar.
+</footer>
+
+<script>
+// ==================== CONFIGURAÇÕES ====================
+const NOTA_MINIMA = 6.0;
+
+const COLUNAS_EXIBICAO = [
+  "Disciplina", "MB1", "MB2", "MB3", "MB4",
+  "MBF", "Média final", "Total de faltas", "% Frequência"
+];
+
+const COLUNAS_BIMESTRES = {
+  "1º Bimestre": ["A11", "A21", "AT1", "BS1", "BE1", "AR1", "MB1"],
+  "2º Bimestre": ["A12", "A22", "AT2", "BS2", "BE2", "AR2", "MB2"],
+  "3º Bimestre": ["A13", "A23", "AT3", "BS3", "BE3", "AR3", "MB3"],
+  "4º Bimestre": ["A14", "A24", "AT4", "BS4", "BE4", "AR4", "MB4"],
+};
+
+const CORES_GRAFICO = [
+  "#2563eb", "#16a34a", "#dc2626", "#f59e0b", "#7c3aed",
+  "#0891b2", "#db2777", "#65a30d", "#ea580c", "#475569",
+];
+
+// ==================== ESTADO GLOBAL ====================
+let dados = [];           // array de objetos (linhas)
+let colunasOriginais = []; // nomes das colunas da planilha
+let arquivoAtual = null;
+let abaAtual = "Ano completo";
+let chartInstance = null;
+
+// ==================== ELEMENTOS DOM ====================
+const inputArquivo = document.getElementById("inputArquivo");
+const btnAbrir = document.getElementById("btnAbrir");
+const btnExportar = document.getElementById("btnExportar");
+const nomeArquivo = document.getElementById("nomeArquivo");
+const pesquisa = document.getElementById("pesquisa");
+const abasContainer = document.getElementById("abas");
+const tabelaHead = document.getElementById("tabelaHead");
+const tabelaBody = document.getElementById("tabelaBody");
+const tabela = document.getElementById("tabela");
+const mensagemVazia = document.getElementById("mensagemVazia");
+const statusBar = document.getElementById("statusBar");
+const cardTotal = document.getElementById("cardTotal");
+const cardAprovadas = document.getElementById("cardAprovadas");
+const cardRecuperacao = document.getElementById("cardRecuperacao");
+const cardMedia = document.getElementById("cardMedia");
+
+// ==================== UTILITÁRIOS ====================
+function numero(valor) {
+  if (valor === null || valor === undefined || valor === "") return null;
+  if (typeof valor === "number") return valor;
+  const s = String(valor).trim().replace(",", ".");
+  if (s === "") return null;
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+function formatar(valor, casas = 1, sufixo = "") {
+  const n = numero(valor);
+  if (n === null) return "—";
+  return n.toFixed(casas).replace(".", ",") + sufixo;
+}
+
+function normalizarTexto(texto) {
+  return String(texto)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function obterMedia(linha) {
+  const media = numero(linha["Média final"]);
+  if (media !== null) return media;
+  const notas = ["MB1", "MB2", "MB3", "MB4"].map(c => numero(linha[c])).filter(n => n !== null);
+  return notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null;
+}
+
+function obterMediaAba(linha, aba) {
+  if (aba === "Ano completo") return obterMedia(linha);
+  const colunaMedia = COLUNAS_BIMESTRES[aba][COLUNAS_BIMESTRES[aba].length - 1];
+  return numero(linha[colunaMedia]);
+}
+
+// ==================== ABRIR PLANILHA ====================
+btnAbrir.addEventListener("click", () => inputArquivo.click());
+
+inputArquivo.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const wb = XLSX.read(evt.target.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // header: 1 => segunda linha (índice 1) é o cabeçalho
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+      if (json.length < 2) throw new Error("Planilha vazia ou sem cabeçalho na linha 2.");
+
+      const cabecalho = json[1].map(c => (c === null ? "" : String(c).trim()));
+      // remove colunas sem nome no final
+      let ultimaCol = cabecalho.length - 1;
+      while (ultimaCol >= 0 && cabecalho[ultimaCol] === "") ultimaCol--;
+      colunasOriginais = cabecalho.slice(0, ultimaCol + 1);
+
+      if (!colunasOriginais.includes("Disciplina")) {
+        throw new Error("Não encontrei a coluna 'Disciplina' na planilha.");
+      }
+
+      dados = [];
+      for (let i = 2; i < json.length; i++) {
+        const row = json[i];
+        if (!row || row.every(c => c === null || c === "")) continue;
+        const obj = {};
+        colunasOriginais.forEach((col, idx) => {
+          if (col) obj[col] = row[idx] !== undefined ? row[idx] : null;
+        });
+        // filtra linhas sem Disciplina
+        if (obj["Disciplina"] === null || obj["Disciplina"] === "") continue;
+        dados.push(obj);
+      }
+
+      if (!dados.length) throw new Error("Nenhuma disciplina encontrada na planilha.");
+
+      arquivoAtual = file.name;
+      nomeArquivo.textContent = file.name;
+      btnExportar.disabled = false;
+      abaAtual = "Ano completo";
+
+      montarAbas();
+      atualizarTudo();
+      statusBar.textContent = `Planilha carregada: ${dados.length} disciplinas.`;
+    } catch (err) {
+      alert("Erro ao abrir planilha:\n" + err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  // permite reabrir o mesmo arquivo
+  inputArquivo.value = "";
+});
+
+// ==================== MONTAR ABAS ====================
+function montarAbas() {
+  abasContainer.innerHTML = "";
+  const nomes = ["Ano completo", ...Object.keys(COLUNAS_BIMESTRES)];
+  nomes.forEach(nome => {
+    const btn = document.createElement("button");
+    btn.className = "aba" + (nome === abaAtual ? " ativo" : "");
+    btn.textContent = nome;
+    btn.addEventListener("click", () => {
+      abaAtual = nome;
+      document.querySelectorAll(".aba").forEach(b => b.classList.remove("ativo"));
+      btn.classList.add("ativo");
+      atualizarTudo();
+    });
+    abasContainer.appendChild(btn);
+  });
+}
+
+// ==================== ATUALIZAR TUDO ====================
+function atualizarTudo() {
+  atualizarTabela();
+  atualizarResumo();
+  desenharGrafico();
+}
+
+// ==================== ATUALIZAR TABELA ====================
+function atualizarTabela() {
+  const termo = normalizarTexto(pesquisa.value);
+  let colunas;
+  if (abaAtual === "Ano completo") {
+    colunas = COLUNAS_EXIBICAO;
+  } else {
+    colunas = ["Disciplina", ...COLUNAS_BIMESTRES[abaAtual]];
+  }
+
+  // cabeçalho
+  tabelaHead.innerHTML = "<tr>" + colunas.map(c => `<th>${c}</th>`).join("") + "</tr>";
+
+  // linhas
+  const linhas = [];
+  dados.forEach((linha) => {
+    const disciplina = String(linha["Disciplina"] ?? "");
+    if (termo && !normalizarTexto(disciplina).includes(termo)) return;
+
+    let media;
+    if (abaAtual === "Ano completo") {
+      media = obterMedia(linha);
+    } else {
+      const cols = COLUNAS_BIMESTRES[abaAtual];
+      media = numero(linha[cols[cols.length - 1]]);
+    }
+
+    let tag;
+    if (media === null || media === undefined) tag = "sem_nota";
+    else if (media < NOTA_MINIMA) tag = "linha_recuperacao";
+    else tag = "linha_normal";
+
+    const valores = colunas.map(col => {
+      if (col === "Disciplina") return disciplina;
+      if (col === "Média final") return formatar(obterMedia(linha));
+      if (col === "Total de faltas") return formatar(linha[col], 0);
+      if (col === "% Frequência") return formatar(linha[col], 2, "%");
+      return formatar(linha[col]);
+    });
+
+    linhas.push(`<tr class="${tag}">${valores.map(v => `<td>${v}</td>`).join("")}</tr>`);
+  });
+
+  if (linhas.length === 0) {
+    tabela.hidden = true;
+    mensagemVazia.hidden = false;
+    mensagemVazia.textContent = dados.length === 0
+      ? "Abra a planilha do boletim para começar."
+      : "Nenhuma disciplina encontrada para o filtro informado.";
+  } else {
+    tabela.hidden = false;
+    mensagemVazia.hidden = true;
+    tabelaBody.innerHTML = linhas.join("");
+  }
+}
+
+// ==================== ATUALIZAR RESUMO ====================
+function atualizarResumo() {
+  if (dados.length === 0) {
+    cardTotal.textContent = "—";
+    cardAprovadas.textContent = "—";
+    cardRecuperacao.textContent = "—";
+    cardMedia.textContent = "—";
+    return;
+  }
+
+  const medias = dados.map(l => obterMediaAba(l, abaAtual)).filter(m => m !== null);
+  const recuperacao = medias.filter(m => m < NOTA_MINIMA).length;
+  const naMedia = medias.filter(m => m >= NOTA_MINIMA).length;
+  const mediaGeral = medias.length
+    ? medias.reduce((a, b) => a + b, 0) / medias.length
+    : null;
+
+  cardTotal.textContent = dados.length;
+  cardAprovadas.textContent = naMedia;
+  cardRecuperacao.textContent = recuperacao;
+  cardMedia.textContent = mediaGeral !== null ? formatar(mediaGeral) : "—";
+}
+
+// ==================== GRÁFICO (BARRAS HORIZONTAIS) ====================
+function obterDadosGrafico() {
+  if (dados.length === 0) return [];
+  const registros = [];
+  dados.forEach((linha, i) => {
+    const media = obterMediaAba(linha, abaAtual);
+    if (media === null) return;
+    const disciplina = String(linha["Disciplina"] ?? "");
+    const cor = media < NOTA_MINIMA ? "#dc2626" : CORES_GRAFICO[i % CORES_GRAFICO.length];
+    registros.push({ disciplina, media, cor });
+  });
+  return registros;
+}
+
+function desenharGrafico() {
+  const ctx = document.getElementById("grafico").getContext("2d");
+  const registros = obterDadosGrafico();
+
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  if (registros.length === 0) {
+    // gráfico vazio com mensagem
+    chartInstance = new Chart(ctx, {
+      type: "bar",
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false },
+        },
+        scales: {
+          x: { display: false },
+          y: { display: false },
+        },
+        animation: false,
+      },
+      plugins: [{
+        id: "mensagemVazia",
+        afterDraw(chart) {
+          const { ctx, width, height } = chart;
+          ctx.save();
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "#9ca3af";
+          ctx.font = "13px Segoe UI, sans-serif";
+          ctx.fillText("Sem dados para exibir", width / 2, height / 2);
+          ctx.restore();
+        }
+      }]
+    });
+    return;
+  }
+
+  const labels = registros.map(r => {
+    const nome = r.disciplina;
+    return nome.length > 18 ? nome.slice(0, 17) + "…" : nome;
+  });
+  const valores = registros.map(r => r.media);
+  const cores = registros.map(r => r.cor);
+
+  // linha de referência (nota mínima) via plugin
+  const linhaMinimaPlugin = {
+    id: "linhaMinima",
+    afterDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea) return;
+      const x = scales.x.getPixelForValue(NOTA_MINIMA);
+      ctx.save();
+      ctx.beginPath();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  chartInstance = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        data: valores,
+        backgroundColor: cores,
+        borderRadius: 4,
+        barThickness: "flex",
+        maxBarThickness: 26,
+      }]
+    },
+    options: {
+      indexAxis: "y", // barras horizontais
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { right: 36, left: 4 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `Nota: ${ctx.parsed.x.toFixed(1).replace(".", ",")}`,
+          }
+        },
+      },
+      scales: {
+        x: {
+          min: 0,
+          max: Math.max(10, ...valores) > 10 ? undefined : 10,
+          grid: { color: "#eef0f3" },
+          ticks: {
+            stepSize: 2,
+            color: "#9ca3af",
+            font: { size: 11 },
+            callback: (v) => String(v).replace(".", ","),
+          },
+        },
+        y: {
+          grid: { display: false },
+          ticks: {
+            color: "#374151",
+            font: { size: 11 },
+            autoSkip: false,
+          },
+        },
+      },
+      animation: { duration: 300 },
+    },
+    plugins: [linhaMinimaPlugin],
+  });
+}
+
+// ==================== EVENTOS DE FILTRO ====================
+pesquisa.addEventListener("input", () => {
+  atualizarTabela();
+});
+
+// redimensionar gráfico quando a janela muda (Chart.js já cuida, mas garantimos)
+window.addEventListener("resize", () => {
+  if (chartInstance) chartInstance.resize();
+});
+
+// ==================== EXPORTAR PDF (download direto) ====================
+btnExportar.addEventListener("click", () => {
+  if (dados.length === 0) {
+    alert("Abra uma planilha antes de exportar.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  // Título
+  doc.setFontSize(16);
+  doc.setTextColor(32, 33, 36);
+  doc.text("Relatório do Boletim Escolar", 14, 16);
+
+  // Subtítulo
+  doc.setFontSize(10);
+  doc.setTextColor(107, 114, 128);
+  const dataStr = new Date().toLocaleDateString("pt-BR");
+  doc.text(`${arquivoAtual || ""} — ${dataStr}`, 14, 22);
+
+  // Colunas conforme a aba atual
+  const colunas = abaAtual === "Ano completo"
+    ? COLUNAS_EXIBICAO
+    : ["Disciplina", ...COLUNAS_BIMESTRES[abaAtual]];
+
+  // Montar corpo da tabela
+  const corpo = [];
+  const coresLinhas = [];
+
+  dados.forEach((linha) => {
+    const disciplina = String(linha["Disciplina"] ?? "");
+
+    let media;
+    if (abaAtual === "Ano completo") media = obterMedia(linha);
+    else {
+      const cols = COLUNAS_BIMESTRES[abaAtual];
+      media = numero(linha[cols[cols.length - 1]]);
+    }
+
+    // Cor de fundo da linha
+    let corFundo = [255, 255, 255]; // branco
+    if (media === null || media === undefined) corFundo = [243, 244, 246]; // cinza
+    else if (media < NOTA_MINIMA) corFundo = [254, 226, 226]; // vermelho claro
+    else corFundo = [220, 252, 231]; // verde claro
+
+    const valores = colunas.map(col => {
+      if (col === "Disciplina") return disciplina;
+      if (col === "Média final") return formatar(obterMedia(linha));
+      if (col === "Total de faltas") return formatar(linha[col], 0);
+      if (col === "% Frequência") return formatar(linha[col], 2, "%");
+      return formatar(linha[col]);
+    });
+
+    corpo.push(valores);
+    coresLinhas.push(corFundo);
+  });
+
+  // Gerar tabela com autoTable
+  doc.autoTable({
+    head: [colunas],
+    body: corpo,
+    startY: 28,
+    styles: {
+      font: "helvetica",
+      fontSize: 8,
+      cellPadding: 2.5,
+      textColor: [32, 33, 36],
+      lineColor: [209, 213, 219],
+      lineWidth: 0.2,
+    },
+    headStyles: {
+      fillColor: [229, 231, 235],
+      textColor: [32, 33, 36],
+      fontStyle: "bold",
+      halign: "center",
+    },
+    columnStyles: {
+      0: { halign: "left", cellWidth: 60 }, // Disciplina mais larga
+    },
+    alternateRowStyles: { fillColor: [255, 255, 255] },
+    didParseCell: function (data) {
+      // Aplica a cor de fundo personalizada por linha (ignora cabeçalho)
+      if (data.section === "body") {
+        data.cell.styles.fillColor = coresLinhas[data.row.index];
+      }
+    },
+  });
+
+  // Baixar o arquivo
+  doc.save("relatorio_boletim.pdf");
+});
+
+// ==================== INICIALIZAÇÃO ====================
+atualizarTudo();
+</script>
+</body>
+</html>
